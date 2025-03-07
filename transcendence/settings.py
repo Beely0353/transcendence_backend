@@ -59,6 +59,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -129,8 +130,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'transcendence',        # Nom de ta base de données
-        'USER': 'NOM-DB',             # Nom d'utilisateur PostgreSQL
-        'PASSWORD': 'MDP-DB',         # Mot de passe PostgreSQL
+        'USER': 'biaroun',             # Nom d'utilisateur PostgreSQL
+        'PASSWORD': 'azerty',         # Mot de passe PostgreSQL
         'HOST': 'localhost',            # Si tu es en local, sinon 'db' avec Docker
         'PORT': '5432',                 # Port par défaut de PostgreSQL
     }
@@ -151,8 +152,10 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',  # Adresse de ton frontend
+    "http://127.0.0.1:5173",
 ]
 
+CORS_ALLOW_CREDENTIALS = True
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
