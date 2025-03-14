@@ -15,7 +15,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken
 
 # Local imports
 from .models import Player, Game, Match, Tournament, Friendship, Block
-from .serializers import PlayerSerializer, GameSerializer, MatchSerializer, TournamentSerializer, FriendshipSerializer, RegisterSerializer
+from .serializers import PlayerSerializer, GameSerializer, MatchSerializer, TournamentSerializer, FriendshipSerializer, PlayerRegisterSerializer, PlayerDeleteSerializer, PlayerUpdateNameSerializer,PlayerUpdatePWDSerializer
 
 # ==============================
 # API DJANGO REST FRAMEWORK
@@ -44,10 +44,52 @@ class TournamentViewSet(AdminViewSet):
 # AUTHENTIFICATION API
 # ==============================
 
-class register_api(generics.CreateAPIView):
-    serializer_class = RegisterSerializer
+
+# ===CRUD PLAYER====
+
+class PlayerRegister_api(generics.CreateAPIView):
+    serializer_class = PlayerRegisterSerializer
     permission_classes = [AllowAny]
 
+class PlayerDetail_api(generics.RetrieveAPIView):
+    queryset = Player.objects.all()
+    serializer_class = PlayerSerializer
+    permission_classes = [AllowAny]
+
+class PlayerUpdateName_api(generics.UpdateAPIView):
+    serializer_class = PlayerUpdateNameSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user.player_profile
+    
+class PlayerUpdatePWD_api(generics.UpdateAPIView):
+    serializer_class = PlayerUpdatePWDSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        return Response({"message": "Mot de passe mis à jour avec succès."}, status=status.HTTP_200_OK)
+
+class PlayerDelete_api(generics.DestroyAPIView):
+    serializer_class = PlayerDeleteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def perform_destroy(self, instance):
+        instance.delete()
+
+    def delete(self, request, *args, **kwargs):
+        response = super().delete(request, *args, **kwargs)
+        return Response({"message": "Compte supprimé avec succès"}, status=status.HTTP_204_NO_CONTENT)
+
+
+# ============CRUD PLAYER================
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

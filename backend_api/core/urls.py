@@ -21,8 +21,14 @@ urlpatterns = [
     # Routes DRF avec router
     path('api/', include(router.urls)),
 
+    # CRUD PLAYER
+    path('api/register/', views.PlayerRegister_api.as_view(), name='register_api'),
+    path('api/player/<int:pk>/', views.PlayerDetail_api.as_view(), name='player-detail'),
+    path('api/player/update-name/', views.PlayerUpdateName_api.as_view(), name='player-update'),
+    path('api/player/update-PWD/', views.PlayerUpdatePWD_api.as_view(), name='player-update'),
+    path('api/player/delete/', views.PlayerDelete_api.as_view(), name='player-delete'),
+
     # Authentification API (Inscription & Connexion)
-    path('api/register/', views.register_api.as_view(), name='register_api'),
     path('api/login/', views.login_api, name='login_api'),
     path('api/logout/', views.logout_api, name='logout_api'),
 
