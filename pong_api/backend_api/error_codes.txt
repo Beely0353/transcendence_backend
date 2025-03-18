@@ -6,4 +6,8 @@ Code: 1005 - Le mot de passe doit contenir au moins une lettre minuscule.
 Code: 1006 - Le mot de passe doit contenir au moins une lettre majuscule.
 Code: 1007 - Le mot de passe doit contenir au moins un caractère spécial.
 Code: 1008 - Mot de passe incorrect.
-
+Code: 1009 - Nom d'utilisateur requis.
+Code: 1010 - mot de passe requis.
+Code: 1010 - Nom d'utilisateur ou mot de passe incorrect.
+Code: 1011 - Token manquant.
+Code: 1011 - Token invalide.
