@@ -15,7 +15,11 @@ from rest_framework_simplejwt.exceptions import InvalidToken
 
 # Local imports
 from .models import Player, Game, Match, Tournament, Friendship, Block
-from .serializers import PlayerSerializer, GameSerializer, MatchSerializer, TournamentSerializer, FriendshipSerializer, PlayerRegisterSerializer, PlayerDeleteSerializer, PlayerUpdateNameSerializer,PlayerUpdatePWDSerializer
+from .serializers import (
+    PlayerSerializer, GameSerializer, MatchSerializer, TournamentSerializer,
+    FriendshipSerializer, PlayerRegisterSerializer, PlayerDeleteSerializer,
+    PlayerUpdateNameSerializer, PlayerUpdatePWDSerializer, SendFriendRequestSerializer
+)
 
 # ==============================
 # API DJANGO REST FRAMEWORK
@@ -45,10 +49,15 @@ class TournamentViewSet(AdminViewSet):
 # ==============================
 
 
-# ===CRUD PLAYER====
+#===CRUD PLAYER====
 
 class PlayerRegister_api(generics.CreateAPIView):
     serializer_class = PlayerRegisterSerializer
+    permission_classes = [AllowAny]
+
+class PlayerList_api(generics.ListAPIView):
+    queryset = Player.objects.all()
+    serializer_class = PlayerSerializer
     permission_classes = [AllowAny]
 
 class PlayerDetail_api(generics.RetrieveAPIView):
@@ -92,8 +101,13 @@ class PlayerDelete_api(generics.DestroyAPIView):
 # ============CRUD FriendShip================
 
 class SendFriendRequest_api(generics.CreateAPIView):
-    serializer_class = None
+    serializer_class = SendFriendRequestSerializer
     permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        player_2 = serializer.validated_data['player_2']
+        serializer.save(player_1=user, status='pending')
 
 # ============CRUD FriendShip================
 
@@ -104,14 +118,16 @@ def login_api(request):
     username = data.get('username')
     password = data.get('password')
 
-    if not username or not password:
-        return Response({"error": "Nom d'utilisateur et mot de passe requis."}, status=status.HTTP_400_BAD_REQUEST)
+    if not username:
+        return Response({"code": 1009}, status=status.HTTP_400_BAD_REQUEST) # Nom d'utilisateur requis.
+    if not password:
+        return Response({"code": 1010}, status=status.HTTP_400_BAD_REQUEST) # Mot de passe requis.
 
 
     user = authenticate(username=username, password=password)
 
     if user is None:
-        return Response({"error": "Nom d'utilisateur ou mot de passe incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"code": 1011}, status=status.HTTP_400_BAD_REQUEST) # Nom d'utilisateur ou mot de passe incorrect.
     
     player, _ = Player.objects.get_or_create(user=user, name=user.username)
     refresh = RefreshToken.for_user(user)
@@ -119,7 +135,7 @@ def login_api(request):
 
     return Response({
         "message": "Connexion réussie.",
-        "player": player_serializer.data,
+        "player": player_serializer.data['id'],
         "tokens": {
             "refresh": str(refresh),
             "access": str(refresh.access_token),
@@ -134,7 +150,7 @@ def logout_api(request):
         token = data.get('token')
         
         if token is None:
-            return Response({'error': 'Token manquant'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'code': 1011}, status=status.HTTP_400_BAD_REQUEST) # Token manquant.
 
         print("Token reçu:", token)
         refresh_token = RefreshToken(token)
@@ -143,8 +159,7 @@ def logout_api(request):
         return Response({'message': 'Déconnexion réussie'}, status=status.HTTP_200_OK)
 
     except InvalidToken:
-        return Response({'error': 'Token invalide'}, status=status.HTTP_400_BAD_REQUEST)
-
+        return Response({'code': 1012}, status=status.HTTP_400_BAD_REQUEST) # Token invalide.
 
 
 

@@ -23,9 +23,10 @@ urlpatterns = [
 
     # CRUD PLAYER
     path('api/register/', views.PlayerRegister_api.as_view(), name='register_api'),
+    path('api/player', views.PlayerList_api.as_view(), name='player-detail'),
     path('api/player/<int:pk>/', views.PlayerDetail_api.as_view(), name='player-detail'),
-    path('api/player/update-name/', views.PlayerUpdateName_api.as_view(), name='player-update'),
-    path('api/player/update-PWD/', views.PlayerUpdatePWD_api.as_view(), name='player-update'),
+    path('api/player/update-name/', views.PlayerUpdateName_api.as_view(), name='player-update-name'),
+    path('api/player/update-PWD/', views.PlayerUpdatePWD_api.as_view(), name='player-update-pwd'),
     path('api/player/delete/', views.PlayerDelete_api.as_view(), name='player-delete'),
 
     # Authentification API (Inscription & Connexion)

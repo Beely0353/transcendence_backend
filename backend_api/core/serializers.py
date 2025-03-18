@@ -47,6 +47,7 @@ class BlockSerializer(serializers.ModelSerializer):
         model = Block
         fields = ['blocker_name', 'blocked_name', 'created_at']
 
+#===CRUD PLAYER====
 
 class PlayerRegisterSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
@@ -59,10 +60,10 @@ class PlayerRegisterSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if data['password'] != data['password2']:
-            raise serializers.ValidationError({"password": "Les mots de passe ne correspondent pas."})
+            raise serializers.ValidationError({"code": 1001})  # Les mots de passe ne correspondent pas.
         if User.objects.filter(username=data['username']).exists():
-            raise serializers.ValidationError({"username": "Ce nom d'utilisateur est déjà pris."})
-        validate_strong_password(data['password'])
+            raise serializers.ValidationError({"code": 1002}) #Ce nom d'utilisateur est déjà pris.
+        validate_strong_password(data['password']) # À voir dans validators.py
         return data
 
     def create(self, validated_data):
@@ -92,9 +93,9 @@ class PlayerUpdateNameSerializer(serializers.ModelSerializer):
     def validate(self, data):
         user = self.context['request'].user
         if not check_password(data['current_password'], user.password):
-            raise serializers.ValidationError({"current_password": "Mot de passe incorrect."})
-        if User.objects.filter(username=data['username']).exists():
-            raise serializers.ValidationError({"username": "Ce nom d'utilisateur est déjà pris."})
+            raise serializers.ValidationError({"code": 1008})  # Mot de passe incorrect.
+        if User.objects.filter(username=data['name']).exists():
+            raise serializers.ValidationError({"code": 1002}) #Ce nom d'utilisateur est déjà pris.
         return data
 
     def update(self, instance, validated_data):
@@ -110,10 +111,10 @@ class PlayerUpdatePWDSerializer(serializers.Serializer):
     def validate(self, data):
         user = self.context['request'].user
         if not user.check_password(data['current_password']):
-            raise serializers.ValidationError({"current_password": "Mot de passe incorrect."})
+            raise serializers.ValidationError({"code": 1008})  # Mot de passe incorrect.
         if data['new_pwd1'] != data['new_pwd2']:
-            raise serializers.ValidationError({"password": "Les mots de passe ne correspondent pas."})
-        validate_strong_password(data['new_pwd1'])
+            raise serializers.ValidationError({"code": 1001})  # Les mots de passe ne correspondent pas.
+        validate_strong_password(data['new_pwd1'])   # À voir dans validators.py
         return data
 
     def update(self, instance, validated_data):
@@ -127,5 +128,63 @@ class PlayerDeleteSerializer(serializers.Serializer):
     def validate(self, data):
         user = self.context['request'].user
         if not user.check_password(data['password']):
-            raise serializers.ValidationError({"password": "Mot de passe incorrect."})
+            raise serializers.ValidationError({"code": 1008})  # Mot de passe incorrect.
         return data
+
+#===CRUD FriendShip====
+
+class SendFriendRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Friendship
+        fields = ['player_1','player_2','status']
+
+    def validate(self, data):
+        user = self.context['request'].user
+        player_2 = data.get('player_2')
+
+        if user == player_2:
+            raise serializers.ValidationError("Vous ne pouvez pas envoyer une demande d'ami à vous-même.")
+        
+        if Friendship.objects.filter(player_1=user, player_2=player_2, status='pending').exists():
+            raise serializers.ValidationError("Une demande d'ami a déjà été envoyée à ce joueur.")
+        
+        if Friendship.objects.filter(player_1=player_2, player_2=user, status='pending').exists():
+            raise serializers.ValidationError("Vous avez déjà reçu une demande d'ami de ce joueur.")
+
+        if Friendship.objects.filter(
+            status='accepted',
+            player_1__in=[user, player_2],
+            player_2__in=[user, player_2]
+        ).exists():
+            raise serializers.ValidationError("Vous êtes déjà amis avec ce joueur.")
+
+        return data
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        player_2 = validated_data.pop('player_2')
+        friendship = Friendship.objects.create(player_1=user, player_2=player_2, status='pending')
+        return friendship
+
+
+class RespondFriendRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model   = Friendship
+        fields  = ['status']
+
+    def validate(self, data):
+        user = self.context['request'].user
+        friendship = self.instance
+
+        if user != friendship.player_1 and user != friendship.player_2:
+            raise serializers.ValidationError("Vous n'êtes pas autorisé à répondre à cette demande.")
+        if friendship.status != 'pending':
+            raise serializers.ValidationError("Cette demande d'ami n'est plus en attente.")
+
+        return data
+    
+    def update(self, instance, validated_data):
+        instance.status = validated_data['status']
+        instance.save()
+        return instance
+         
