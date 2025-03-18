@@ -1,0 +1,9 @@
+Code: 1001 - Les mots de passe ne correspondent pas.
+Code: 1002 - Ce nom d'utilisateur est déjà pris.
+Code: 1003 - Le mot de passe doit contenir au moins 8 caractères.
+Code: 1004 - Le mot de passe doit contenir au moins un chiffre.
+Code: 1005 - Le mot de passe doit contenir au moins une lettre minuscule.
+Code: 1006 - Le mot de passe doit contenir au moins une lettre majuscule.
+Code: 1007 - Le mot de passe doit contenir au moins un caractère spécial.
+Code: 1008 - Mot de passe incorrect.
+

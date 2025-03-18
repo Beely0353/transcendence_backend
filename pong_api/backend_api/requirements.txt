@@ -1,0 +1,14 @@
+# Django et Django REST Framework
+django==5.1.5
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1  # JWT pour l'authentification
+
+# Base de données PostgreSQL
+psycopg2-binary==2.9.9  # Connecteur PostgreSQL
+
+# CORS et sécurité
+django-cors-headers==4.3.1  # Pour autoriser les requêtes du frontend
+whitenoise==6.6.0  # Gestion des fichiers statiques en production
+
+# Gestion de l’environnement
+python-dotenv==1.0.1  # Permet d’utiliser un fichier .env pour les variables
