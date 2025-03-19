@@ -15,11 +15,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken
 
 # Local imports
 from .models import Player, Game, Match, Tournament, Friendship, Block
-from .serializers import (
-    PlayerSerializer, GameSerializer, MatchSerializer, TournamentSerializer,
-    FriendshipSerializer, PlayerRegisterSerializer, PlayerDeleteSerializer,
-    PlayerUpdateNameSerializer, PlayerUpdatePWDSerializer, SendFriendRequestSerializer
-)
+from . import serializers
 
 # ==============================
 # API DJANGO REST FRAMEWORK
@@ -30,19 +26,19 @@ class AdminViewSet(viewsets.ModelViewSet):
 
 class PlayerViewSet(AdminViewSet):
     queryset = Player.objects.all()
-    serializer_class = PlayerSerializer
+    serializer_class = serializers.PlayerSerializer
 
 class GameViewSet(AdminViewSet):
     queryset = Game.objects.all()
-    serializer_class = GameSerializer
+    serializer_class = serializers.GameSerializer
 
 class MatchViewSet(AdminViewSet):
     queryset = Match.objects.all()
-    serializer_class = MatchSerializer
+    serializer_class = serializers.MatchSerializer
 
 class TournamentViewSet(AdminViewSet):
     queryset = Tournament.objects.all()
-    serializer_class = TournamentSerializer
+    serializer_class = serializers.TournamentSerializer
 
 # ==============================
 # AUTHENTIFICATION API
@@ -52,39 +48,35 @@ class TournamentViewSet(AdminViewSet):
 #===CRUD PLAYER====
 
 class PlayerRegister_api(generics.CreateAPIView):
-    serializer_class = PlayerRegisterSerializer
+    serializer_class = serializers.PlayerRegisterSerializer
     permission_classes = [AllowAny]
 
 class PlayerList_api(generics.ListAPIView):
     queryset = Player.objects.all()
-    serializer_class = PlayerSerializer
+    serializer_class = serializers.PlayerSerializer
     permission_classes = [AllowAny]
 
 class PlayerDetail_api(generics.RetrieveAPIView):
     queryset = Player.objects.all()
-    serializer_class = PlayerSerializer
+    serializer_class = serializers.PlayerSerializer
     permission_classes = [AllowAny]
 
 class PlayerUpdateName_api(generics.UpdateAPIView):
-    serializer_class = PlayerUpdateNameSerializer
+    serializer_class = serializers.PlayerUpdateNameSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
         return self.request.user.player_profile
     
 class PlayerUpdatePWD_api(generics.UpdateAPIView):
-    serializer_class = PlayerUpdatePWDSerializer
+    serializer_class = serializers.PlayerUpdatePWDSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
         return self.request.user
 
-    def update(self, request, *args, **kwargs):
-        response = super().update(request, *args, **kwargs)
-        return Response({"message": "Mot de passe mis à jour avec succès."}, status=status.HTTP_200_OK)
-
 class PlayerDelete_api(generics.DestroyAPIView):
-    serializer_class = PlayerDeleteSerializer
+    serializer_class = serializers.PlayerDeleteSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
@@ -93,15 +85,18 @@ class PlayerDelete_api(generics.DestroyAPIView):
     def perform_destroy(self, instance):
         instance.delete()
 
-    def delete(self, request, *args, **kwargs):
-        response = super().delete(request, *args, **kwargs)
-        return Response({"message": "Compte supprimé avec succès"}, status=status.HTTP_204_NO_CONTENT)
+class PlayerLogin_api(generics.CreateAPIView):
+    serializer_class = serializers.PlayerLoginSerializer
+    permission_classes = [AllowAny]
 
+class PlayerLogout_api(generics.CreateAPIView):
+    serializer_class = serializers.PlayerLogoutSerializer
+    permission_classes = [IsAuthenticated]
 
 # ============CRUD FriendShip================
 
 class SendFriendRequest_api(generics.CreateAPIView):
-    serializer_class = SendFriendRequestSerializer
+    serializer_class = serializers.SendFriendRequestSerializer
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
@@ -111,40 +106,9 @@ class SendFriendRequest_api(generics.CreateAPIView):
 
 # ============CRUD FriendShip================
 
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def login_api(request):
-    data = request.data
-    username = data.get('username')
-    password = data.get('password')
-
-    if not username:
-        return Response({"code": 1009}, status=status.HTTP_400_BAD_REQUEST) # Nom d'utilisateur requis.
-    if not password:
-        return Response({"code": 1010}, status=status.HTTP_400_BAD_REQUEST) # Mot de passe requis.
-
-
-    user = authenticate(username=username, password=password)
-
-    if user is None:
-        return Response({"code": 1011}, status=status.HTTP_400_BAD_REQUEST) # Nom d'utilisateur ou mot de passe incorrect.
-    
-    player, _ = Player.objects.get_or_create(user=user, name=user.username)
-    refresh = RefreshToken.for_user(user)
-    player_serializer = PlayerSerializer(player)
-
-    return Response({
-        "message": "Connexion réussie.",
-        "player": player_serializer.data['id'],
-        "tokens": {
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
-        }
-    }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 def logout_api(request):
-    print("test")
     try:
         data = request.data
         token = data.get('token')
@@ -246,21 +210,6 @@ class UnblockPlayer(APIView):
 
 # ==============================
 
-class FriendListView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]  # Cela s'assure que l'utilisateur est authentifié avec JWT
-
-    def get(self, request, *args, **kwargs):
-        # On récupère le joueur actuellement connecté via son profil Player associé au User
-        player = request.user.player_profile
-
-        # Récupérer la liste des amis du joueur (en supposant que "friends" soit une ManyToManyField sur Player)
-        friends = player.friends.all()
-
-        # Sérialiser les amis récupérés
-        serializer = PlayerSerializer(friends, many=True)
-
-        # Retourner la réponse avec la liste des amis
-        return Response(serializer.data)
 
 
 # ==============================
@@ -268,7 +217,7 @@ class FriendListView(generics.GenericAPIView):
 class MatchViewSet(viewsets.ModelViewSet):
     """ API CRUD pour gérer les matchs """
     queryset = Match.objects.all()
-    serializer_class = MatchSerializer
+    serializer_class = serializers.MatchSerializer
 
     def create(self, request, *args, **kwargs):
         """ Personnalise la création d'un match en générant les rounds (Game) """

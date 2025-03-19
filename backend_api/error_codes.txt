@@ -1,0 +1,15 @@
+Code: 1000 - Demande réussie..
+Code: 1001 - Les mots de passe ne correspondent pas.
+Code: 1002 - Ce nom d'utilisateur est déjà pris.
+Code: 1003 - Le mot de passe doit contenir au moins 8 caractères.
+Code: 1004 - Le mot de passe doit contenir au moins un chiffre.
+Code: 1005 - Le mot de passe doit contenir au moins une lettre minuscule.
+Code: 1006 - Le mot de passe doit contenir au moins une lettre majuscule.
+Code: 1007 - Le mot de passe doit contenir au moins un caractère spécial.
+Code: 1008 - Mot de passe incorrect.
+Code: 1009 - Nom d'utilisateur requis.
+Code: 1010 - mot de passe requis.
+Code: 1011 - Token manquant.
+Code: 1012 - Token invalide.
+Code: 1013 - Nom d'utilisateur ou mot de passe incorrect.
+

@@ -1,9 +1,11 @@
+import uuid
 from rest_framework import serializers
 from .models import Player, Game, Match, Tournament, Friendship, Block
 from django.contrib.auth.models import User
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from django.contrib.auth.hashers import check_password
 from core.validators import validate_strong_password
+from django.contrib.auth import authenticate
 
 class PlayerSerializer(serializers.ModelSerializer):
     class Meta:
@@ -49,41 +51,41 @@ class BlockSerializer(serializers.ModelSerializer):
 
 #===CRUD PLAYER====
 
-class PlayerRegisterSerializer(serializers.ModelSerializer):
-    password2 = serializers.CharField(write_only=True)
-    token = serializers.SerializerMethodField()
-
-    class Meta:
-        model = User
-        fields = ['username', 'password', 'password2', 'token']
-        extra_kwargs = {'password': {'write_only': True}}
+class PlayerRegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(write_only=True, allow_blank=True, allow_null=True)
+    password = serializers.CharField(write_only=True, allow_blank=True, allow_null=True)
+    password2 = serializers.CharField(write_only=True, required=True)
 
     def validate(self, data):
+        print(data)
+        if not data.get('username'):
+            raise serializers.ValidationError({"code": 1009}) # Nom d'utilisateur requis.
+        if not data.get('password'):
+            raise serializers.ValidationError({"code": 1010}) # Mot de passe requis.
         if data['password'] != data['password2']:
             raise serializers.ValidationError({"code": 1001})  # Les mots de passe ne correspondent pas.
-        if User.objects.filter(username=data['username']).exists():
-            raise serializers.ValidationError({"code": 1002}) #Ce nom d'utilisateur est déjà pris.
-        validate_strong_password(data['password']) # À voir dans validators.py
+        if Player.objects.filter(name=data['username']).exists():
+            raise serializers.ValidationError({"code": 1002})  # Ce nom d'utilisateur est déjà pris.
+        validate_strong_password(data['password'])
         return data
 
     def create(self, validated_data):
         validated_data.pop('password2')
         user = User.objects.create_user(
-            username=validated_data['username'],
+            username=f"temp_{uuid.uuid4().hex[:8]}",
             password=validated_data['password']
         )
-        Player.objects.create(user=user, name=validated_data['username'])
-        return user
+        player = Player.objects.create(user=user, name=validated_data['username'])
+        user.username = f"player_{player.id}"
+        user.save()
+        return {"code": 1000}
 
-    def get_token(self, obj):
-        refresh = RefreshToken.for_user(obj)
-        return {
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
-        }
+    def to_representation(self, instance):
+            return instance
 
 
 class PlayerUpdateNameSerializer(serializers.ModelSerializer):
+    name             = serializers.CharField(write_only=True)
     current_password = serializers.CharField(write_only=True)
 
     class Meta:
@@ -94,7 +96,7 @@ class PlayerUpdateNameSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         if not check_password(data['current_password'], user.password):
             raise serializers.ValidationError({"code": 1008})  # Mot de passe incorrect.
-        if User.objects.filter(username=data['name']).exists():
+        if Player.objects.filter(name=data['name']).exists():
             raise serializers.ValidationError({"code": 1002}) #Ce nom d'utilisateur est déjà pris.
         return data
 
@@ -102,6 +104,9 @@ class PlayerUpdateNameSerializer(serializers.ModelSerializer):
         instance.name = validated_data.get('name', instance.name)
         instance.save()
         return instance
+    
+    def to_representation(self, instance):
+        return {"code": 1000}
     
 class PlayerUpdatePWDSerializer(serializers.Serializer):
     current_password = serializers.CharField(write_only=True)
@@ -121,6 +126,9 @@ class PlayerUpdatePWDSerializer(serializers.Serializer):
         instance.set_password(validated_data['new_pwd1'])
         instance.save()
         return instance
+    
+    def to_representation(self, instance):
+        return {"code": 1000}
 
 class PlayerDeleteSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
@@ -130,6 +138,75 @@ class PlayerDeleteSerializer(serializers.Serializer):
         if not user.check_password(data['password']):
             raise serializers.ValidationError({"code": 1008})  # Mot de passe incorrect.
         return data
+    
+    def to_representation(self, instance):
+        return {"code": 1000}
+
+class PlayerLoginSerializer(serializers.Serializer):
+    username = serializers.CharField(write_only=True, allow_blank=True, allow_null=True)
+    password = serializers.CharField(write_only=True, allow_blank=True, allow_null=True)
+
+    def validate(self, data):
+        player_name = data.get('username')
+        password = data.get('password')
+
+        if not player_name:
+            raise serializers.ValidationError({"code": 1009}) # Nom requis
+        if not password:
+            raise serializers.ValidationError({"code": 1010}) # Mot de passe requis
+
+
+        try:
+            player = Player.objects.get(name=player_name)
+        except Player.DoesNotExist:
+            raise serializers.ValidationError({"code": 1013}) # Nom ou mot de passe incorrect
+    
+        username = player.user.username
+        user = authenticate(username=username, password=password)
+        if user is None:
+            raise serializers.ValidationError({"code": 1013}) # Nom ou mot de passe incorrect
+
+        data['user'] = user
+        data['player'] = player
+        return data
+
+    def create(self, validated_data):
+        player = validated_data['player']
+        return player
+
+    def to_representation(self, instance):
+        refresh = RefreshToken.for_user(instance.user)
+        return {
+            "code": 1000,
+            "player": instance.id,
+            "tokens": {
+                "refresh": str(refresh),
+                "access": str(refresh.access_token),
+            }
+        }
+
+class PlayerLogoutSerializer(serializers.Serializer):
+    token = serializers.CharField(write_only=True, allow_blank=True, allow_null=True)
+
+    def validate(self, data):
+        token = data.get('token')
+
+        if not token:
+            raise serializers.ValidationError({"code": 1011})
+
+        try:
+            refresh_token = RefreshToken(token)
+            refresh_token.blacklist()
+        except TokenError:
+            raise serializers.ValidationError({"code": 1012})
+
+        return data
+
+    def create(self, validated_data):
+        return {"success": True}
+
+    def to_representation(self, instance):
+        return {"code": 1000}
 
 #===CRUD FriendShip====
 

@@ -30,8 +30,8 @@ urlpatterns = [
     path('api/player/delete/', views.PlayerDelete_api.as_view(), name='player-delete'),
 
     # Authentification API (Inscription & Connexion)
-    path('api/login/', views.login_api, name='login_api'),
-    path('api/logout/', views.logout_api, name='logout_api'),
+    path('api/login/', views.PlayerLogin_api.as_view(), name='login_api'),
+    path('api/logout/', views.PlayerLogout_api.as_view(), name='logout_api'),
 
     # JWT Token Endpoints
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
