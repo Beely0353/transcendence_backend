@@ -2,6 +2,7 @@
 from django.shortcuts import render
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+from django.db import models
 import uuid
 
 # DRF imports
@@ -99,163 +100,136 @@ class SendFriendRequest_api(generics.CreateAPIView):
     serializer_class = serializers.SendFriendRequestSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        user = self.request.user
-        player_2 = serializer.validated_data['player_2']
-        serializer.save(player_1=user, status='pending')
+class FriendRequestAccept_api(generics.UpdateAPIView):
+    serializer_class = serializers.FriendRequestAcceptSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
+    queryset = Friendship.objects.all()
 
-# ============CRUD FriendShip================
+    def get_object(self):
+        return Friendship.objects.get(id=self.kwargs['pk'])
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"code": 1000}, status=status.HTTP_200_OK)
+    
+class FriendRequestReject_api(generics.DestroyAPIView):
+    serializer_class = serializers.FriendRequestRejectSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
+    queryset = Friendship.objects.all()
+
+    def get_object(self):
+        return Friendship.objects.get(id=self.kwargs['pk'])
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        serializer.is_valid(raise_exception=True)  
+        self.perform_destroy(instance)
+        return Response({"code": 1000}, status=status.HTTP_200_OK)
+
+class FriendRequestCancel_api(generics.DestroyAPIView):
+    serializer_class = serializers.FriendRequestCancelSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
+    queryset = Friendship.objects.all()
+
+    def get_object(self):
+        request_user = self.request.user
+        obj = super().get_object()
+
+        # Validation personnalisée
+        if obj.player_1.user != request_user:
+            raise serializers.ValidationError({"code": 1023})  # "Seul l'expéditeur peut annuler cette demande."
+        if obj.status != 'pending':
+            raise serializers.ValidationError({"code": 1021})  # "Cette demande a déjà été traitée."
+
+        return obj
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({"code": 1000}, status=status.HTTP_200_OK)
+    
+class FriendRemove_api(generics.DestroyAPIView):
+    serializer_class = serializers.FriendshipRemoveSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'id' 
+    queryset = Friendship.objects.all()
+
+    def get_object(self):
+        player = self.request.user.player_profile
+        obj = super().get_object()
+
+        # Validation personnalisée
+        if obj.status != 'accepted':
+            raise serializers.ValidationError({"code": 1030})  # "Cette relation n'est pas une amitié acceptée."
+        if obj.player_1 != player and obj.player_2 != player:
+            raise serializers.ValidationError({"code": 1025})  # "Vous n'êtes pas amis avec ce joueur."
+
+        return obj
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        Friendship.objects.filter(
+            status='accepted',
+            player_1=instance.player_1,
+            player_2=instance.player_2
+        ).delete()
+        Friendship.objects.filter(
+            status='accepted',
+            player_1=instance.player_2,
+            player_2=instance.player_1
+        ).delete()
+        return Response({"code": 1000}, status=status.HTTP_200_OK)
 
 
-@api_view(['POST'])
-def logout_api(request):
-    try:
-        data = request.data
-        token = data.get('token')
+class FriendshipList_api(generics.ListAPIView):
+    serializer_class = serializers.FriendshipListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user.player_profile
+        return Friendship.objects.filter(
+            models.Q(player_1=user) | models.Q(player_2=user)
+        )
+
+# ============CRUD Block================
+
+class BlockPlayer_api(generics.CreateAPIView):
+    serializer_class = serializers.BlockPlayerSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class BlockListView(generics.ListAPIView):
+    serializer_class = serializers.BlockListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user.player_profile
+        return Block.objects.filter(blocker=user)
+
+class UnblockPlayerView(generics.DestroyAPIView):
+    serializer_class = serializers.UnblockPlayerSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'id'
+    queryset = Block.objects.all()
+
+    def get_object(self):
+        blocker = self.request.user.player_profile
+        obj = super().get_object()
+
+        # Validation personnalisée
+        if obj.blocker != blocker:
+            raise serializers.ValidationError({"code": 1028})  # "Vous n'avez pas bloqué ce joueur."
         
-        if token is None:
-            return Response({'code': 1011}, status=status.HTTP_400_BAD_REQUEST) # Token manquant.
+        return obj
 
-        print("Token reçu:", token)
-        refresh_token = RefreshToken(token)
-        refresh_token.blacklist()
-
-        return Response({'message': 'Déconnexion réussie'}, status=status.HTTP_200_OK)
-
-    except InvalidToken:
-        return Response({'code': 1012}, status=status.HTTP_400_BAD_REQUEST) # Token invalide.
-
-
-
-# ==============================
-# PAS FONCTIONNEL
-# ==============================
-
-class SendFriendRequest(APIView):
-    def post(self, request, *args, **kwargs):
-        sender = request.user.player_profile
-        receiver_id = request.data.get('receiver_id')
-        
-        try:
-            receiver = Player.objects.get(id=receiver_id)
-        except Player.DoesNotExist:
-            return Response({'error': 'Player not found'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Vérification du blocage avant d'envoyer la demande d'ami
-        if Block.objects.filter(blocker=receiver, blocked=sender).exists():
-            return Response({'error': 'You have been blocked by this player, you cannot send a friend request.'}, 
-                            status=status.HTTP_403_FORBIDDEN)
-
-        # Code pour envoyer la demande d'ami ici
-
-        return Response({'message': 'Friend request sent'}, status=status.HTTP_200_OK)
-
-class AcceptFriendRequest(APIView):
-    def post(self, request, *args, **kwargs):
-        player_1 = request.user.player_profile
-        player_2_id = request.data.get('player_2_id')
-        try:
-            friendship = Friendship.objects.get(player_1=player_1, player_2__id=player_2_id, status='pending')
-        except Friendship.DoesNotExist:
-            return Response({'error': 'Friend request not found or already accepted/rejected'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Accepter la demande d'ami
-        friendship.status = 'accepted'
-        friendship.save()
-
-        return Response({'message': 'Friend request accepted'}, status=status.HTTP_200_OK)
-
-class RejectFriendRequest(APIView):
-    def post(self, request, *args, **kwargs):
-        player_1 = request.user.player_profile
-        player_2_id = request.data.get('player_2_id')
-        try:
-            friendship = Friendship.objects.get(player_1=player_1, player_2__id=player_2_id, status='pending')
-        except Friendship.DoesNotExist:
-            return Response({'error': 'Friend request not found or already accepted/rejected'}, status=status.HTTP_400_BAD_REQUEST)
-
-        friendship.status = 'rejected'
-        friendship.save()
-
-        return Response({'message': 'Friend request rejected'}, status=status.HTTP_200_OK)
-
-
-class BlockPlayer(APIView):
-    def post(self, request, *args, **kwargs):
-        blocker = request.user.player_profile
-        blocked_id = request.data.get('blocked_id')
-        try:
-            blocked = Player.objects.get(id=blocked_id)
-        except Player.DoesNotExist:
-            return Response({'error': 'Player not found'}, status=status.HTTP_400_BAD_REQUEST)
-
-        block, created = Block.objects.get_or_create(blocker=blocker, blocked=blocked)
-        if not created:
-            return Response({'error': 'Player is already blocked'}, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response({'message': 'Player blocked'}, status=status.HTTP_201_CREATED)
-
-class UnblockPlayer(APIView):
-    def post(self, request, *args, **kwargs):
-        blocker = request.user.player_profile
-        blocked_id = request.data.get('blocked_id')
-        try:
-            block = Block.objects.get(blocker=blocker, blocked__id=blocked_id)
-        except Block.DoesNotExist:
-            return Response({'error': 'Player not found or not blocked'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        block.delete()
-
-        return Response({'message': 'Player unblocked'}, status=status.HTTP_200_OK)
-
-# ==============================
-
-
-
-# ==============================
-
-class MatchViewSet(viewsets.ModelViewSet):
-    """ API CRUD pour gérer les matchs """
-    queryset = Match.objects.all()
-    serializer_class = serializers.MatchSerializer
-
-    def create(self, request, *args, **kwargs):
-        """ Personnalise la création d'un match en générant les rounds (Game) """
-        data = request.data
-        try:
-            # 📌 1️⃣ Vérifier que les joueurs existent
-            player_1 = Player.objects.get(id=data['player_1'])
-            player_2 = Player.objects.get(id=data['player_2'])
-
-            # 📌 2️⃣ Créer le match
-            match = Match.objects.create(
-                player_1=player_1,
-                player_2=player_2,
-                type=data.get('type', 'PRIVEE'),
-                private_code=uuid.uuid4() if data.get('type') == 'PRIVEE' else None
-            )
-
-            # 📌 3️⃣ Créer les rounds (Game) associés
-            number_of_games = data.get('rounds', 3)  # 3 rounds par défaut
-            for _ in range(number_of_games):
-                Game.objects.create(
-                    match=match,
-                    player_1=player_1,
-                    player_2=player_2,
-                    ball_position={'x': 400, 'y': 200},
-                    paddle_position={'paddle_l': 150, 'paddle_r': 150}
-                )
-
-            return Response({
-                'match_id': match.id,
-                'ws_url': f"ws://127.0.0.1:8000/ws/pong/{match.id}/",
-                'message': 'Match créé avec succès !'
-            }, status=201)
-
-        except Player.DoesNotExist:
-            return Response({'error': 'Joueur introuvable'}, status=400)
-        except Exception as e:
-            return Response({'error': str(e)}, status=500)
-
-
-
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({"code": 1000}, status=status.HTTP_200_OK)

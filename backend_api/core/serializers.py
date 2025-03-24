@@ -57,7 +57,6 @@ class PlayerRegisterSerializer(serializers.Serializer):
     password2 = serializers.CharField(write_only=True, required=True)
 
     def validate(self, data):
-        print(data)
         if not data.get('username'):
             raise serializers.ValidationError({"code": 1009}) # Nom d'utilisateur requis.
         if not data.get('password'):
@@ -78,10 +77,10 @@ class PlayerRegisterSerializer(serializers.Serializer):
         player = Player.objects.create(user=user, name=validated_data['username'])
         user.username = f"player_{player.id}"
         user.save()
-        return {"code": 1000}
+        return user
 
     def to_representation(self, instance):
-            return instance
+            return {"code": 1000}
 
 
 class PlayerUpdateNameSerializer(serializers.ModelSerializer):
@@ -211,57 +210,185 @@ class PlayerLogoutSerializer(serializers.Serializer):
 #===CRUD FriendShip====
 
 class SendFriendRequestSerializer(serializers.ModelSerializer):
+    player_2 = serializers.IntegerField(write_only=True)
+
     class Meta:
         model = Friendship
-        fields = ['player_1','player_2','status']
+        fields = ['player_2']
 
     def validate(self, data):
-        user = self.context['request'].user
-        player_2 = data.get('player_2')
+        player_1 = self.context['request'].user
+        player_2_id = data.get('player_2')
 
-        if user == player_2:
-            raise serializers.ValidationError("Vous ne pouvez pas envoyer une demande d'ami à vous-même.")
-        
-        if Friendship.objects.filter(player_1=user, player_2=player_2, status='pending').exists():
-            raise serializers.ValidationError("Une demande d'ami a déjà été envoyée à ce joueur.")
-        
-        if Friendship.objects.filter(player_1=player_2, player_2=user, status='pending').exists():
-            raise serializers.ValidationError("Vous avez déjà reçu une demande d'ami de ce joueur.")
-
+        try:
+            player_2 = Player.objects.get(id=player_2_id)
+        except Player.DoesNotExist:
+            raise serializers.ValidationError({"code": 1014})  # Le joueur cible n'existe pas.
+        if player_1 == player_2.user:
+            raise serializers.ValidationError({"code": 1015})  # Vous ne pouvez pas envoyer une demande d'ami à vous-même.
+        if Friendship.objects.filter(player_1=player_1.player_profile, player_2=player_2, status='pending').exists():
+            raise serializers.ValidationError({"code": 1016})  # Une demande d'ami a déjà été envoyée à ce joueur.
+        if Friendship.objects.filter(player_1=player_2, player_2=player_1.player_profile, status='pending').exists():
+            raise serializers.ValidationError({"code": 1017})  # Vous avez déjà reçu une demande d'ami de ce joueur.
         if Friendship.objects.filter(
             status='accepted',
-            player_1__in=[user, player_2],
-            player_2__in=[user, player_2]
+            player_1__in=[player_1.player_profile, player_2],
+            player_2__in=[player_1.player_profile, player_2]
         ).exists():
-            raise serializers.ValidationError("Vous êtes déjà amis avec ce joueur.")
+            raise serializers.ValidationError({"code": 1002})  # Vous êtes déjà amis avec ce joueur.
+        if Block.objects.filter(blocker=player_1.player_profile, blocked=player_2).exists():
+            raise serializers.ValidationError({"code": 1018})  # Vous avez bloqué ce joueur.
+        if Block.objects.filter(blocker=player_2, blocked=player_1.player_profile).exists():
+            raise serializers.ValidationError({"code": 1019})  # Ce joueur vous a bloqué.
 
         return data
 
     def create(self, validated_data):
-        user = self.context['request'].user
-        player_2 = validated_data.pop('player_2')
-        friendship = Friendship.objects.create(player_1=user, player_2=player_2, status='pending')
+        player_1 = self.context['request'].user.player_profile
+        player_2_id = validated_data.pop('player_2')
+        player_2 = Player.objects.get(id=player_2_id)
+        friendship = Friendship.objects.create(player_1=player_1, player_2=player_2, status='pending')
         return friendship
 
+    def to_representation(self, instance):
+        return {"code": 1000} 
 
-class RespondFriendRequestSerializer(serializers.ModelSerializer):
+
+class FriendRequestAcceptSerializer(serializers.ModelSerializer):
     class Meta:
-        model   = Friendship
-        fields  = ['status']
+        model = Friendship
+        fields = []
 
     def validate(self, data):
-        user = self.context['request'].user
         friendship = self.instance
+        request_user = self.context['request'].user
 
-        if user != friendship.player_1 and user != friendship.player_2:
-            raise serializers.ValidationError("Vous n'êtes pas autorisé à répondre à cette demande.")
+        if friendship.player_2.user != request_user:
+            raise serializers.ValidationError({"code": 1020})  # "Seul le destinataire peut accepter cette demande."
         if friendship.status != 'pending':
-            raise serializers.ValidationError("Cette demande d'ami n'est plus en attente.")
+            raise serializers.ValidationError({"code": 1021})  # "Cette demande a déjà été traitée."
 
         return data
-    
+
     def update(self, instance, validated_data):
-        instance.status = validated_data['status']
+        instance.status = 'accepted'
         instance.save()
+        Friendship.objects.get_or_create(
+            player_1=instance.player_2,
+            player_2=instance.player_1,
+            defaults={'status': 'accepted'}
+        )
         return instance
-         
+
+    def to_representation(self, instance):
+        return {"code": 1000} 
+
+class FriendRequestRejectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Friendship
+        fields = []
+
+    def validate(self, data):
+        friendship = self.instance
+        request_user = self.context['request'].user
+
+        if friendship.player_2.user != request_user:
+            raise serializers.ValidationError({"code": 1020})  # "Seul le destinataire peut rejeter cette demande."
+        if friendship.status != 'pending':
+            raise serializers.ValidationError({"code": 1021})  # "Cette demande a déjà été traitée."
+
+        return data
+
+    def to_representation(self, instance):
+        return {"code": 1000}
+
+class FriendRequestCancelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Friendship
+        fields = []
+
+    def to_representation(self, instance):
+        return {"code": 1000}
+
+
+class FriendshipRemoveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Friendship
+        fields = []
+
+    def validate(self, data):
+        return data
+
+    def to_representation(self, instance):
+        return {"code": 1000} 
+
+class FriendshipListSerializer(serializers.ModelSerializer):
+    player_1 = serializers.CharField(source='player_1.name', read_only=True)
+    player_2 = serializers.CharField(source='player_2.name', read_only=True)
+
+    class Meta:
+        model = Friendship
+        fields = ['id', 'player_1', 'player_2', 'status', 'created_at']
+
+
+#===CRUD Block====
+
+class BlockPlayerSerializer(serializers.ModelSerializer):
+    blocked_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Block
+        fields = ['blocked_id']
+
+    def validate(self, data):
+        blocker = self.context['request'].user.player_profile
+        blocked_id = data.get('blocked_id')
+
+        try:
+            blocked = Player.objects.get(id=blocked_id)
+        except Player.DoesNotExist:
+            raise serializers.ValidationError({"code": 1014})  # "Le joueur cible n'existe pas."
+        if blocker == blocked:
+            raise serializers.ValidationError({"code": 1026})  # "Vous ne pouvez pas vous bloquer vous-même."
+        if Block.objects.filter(blocker=blocker, blocked=blocked).exists():
+            raise serializers.ValidationError({"code": 1027})  # "Ce joueur est déjà bloqué."
+
+
+        Friendship.objects.filter(
+            status='accepted',
+            player_1__in=[blocker, blocked],
+            player_2__in=[blocker, blocked]
+        ).delete()
+        Friendship.objects.filter(
+            status='pending',
+            player_1__in=[blocker, blocked],
+            player_2__in=[blocker, blocked]
+        ).delete()
+        return data
+
+    def create(self, validated_data):
+        blocker = self.context['request'].user.player_profile
+        blocked_id = validated_data.pop('blocked_id')
+        blocked = Player.objects.get(id=blocked_id)
+        block = Block.objects.create(blocker=blocker, blocked=blocked)
+        return block
+
+    def to_representation(self, instance):
+        return {"code": 1000}
+
+
+class BlockListSerializer(serializers.ModelSerializer):
+    blocked = serializers.CharField(source='blocked.name', read_only=True)
+
+    class Meta:
+        model = Block
+        fields = ['id', 'blocked', 'created_at']
+
+
+class UnblockPlayerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Block
+        fields = []
+
+    def to_representation(self, instance):
+        return {"code": 1000}

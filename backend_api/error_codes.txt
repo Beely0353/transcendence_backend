@@ -12,4 +12,15 @@ Code: 1010 - mot de passe requis.
 Code: 1011 - Token manquant.
 Code: 1012 - Token invalide.
 Code: 1013 - Nom d'utilisateur ou mot de passe incorrect.
-
+Code: 1014 - Le joueur cible n'existe pas.
+Code: 1015 - Vous ne pouvez pas envoyer une demande d'ami à vous-même.
+Code: 1016 - Une demande d'ami a déjà été envoyée à ce joueur.
+Code: 1017 - Vous avez déjà reçu une demande d'ami de ce joueur.
+Code: 1018 - Vous avez bloqué ce joueur.
+Code: 1019 - Ce joueur vous a bloqué.
+Code: 1020 - Seul le destinataire peut répondre à cette demande.
+Code: 1021 - Cette demande a déjà été traitée.
+Code: 1026 - Vous ne pouvez pas vous bloquer vous-même.
+Code: 1027 - Ce joueur est déjà bloqué.
+Code: 1028 - Ce joueur n'est pas bloqué.
+Code: 1029 - Cette relation n'est pas une amitié acceptée.
