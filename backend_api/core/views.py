@@ -3,10 +3,11 @@ from django.shortcuts import render
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from django.db import models
+from django.utils import timezone
 import uuid
 
 # DRF imports
-from rest_framework import status, viewsets, generics
+from rest_framework import status, viewsets, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -55,12 +56,30 @@ class PlayerRegister_api(generics.CreateAPIView):
 class PlayerList_api(generics.ListAPIView):
     queryset = Player.objects.all()
     serializer_class = serializers.PlayerSerializer
-    permission_classes = [AllowAny]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
 class PlayerDetail_api(generics.RetrieveAPIView):
     queryset = Player.objects.all()
     serializer_class = serializers.PlayerSerializer
-    permission_classes = [AllowAny]
+
+
+
+class PlayerUpdateInfo_api(generics.UpdateAPIView):
+    serializer_class = serializers.PlayerUpdateInfoSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user.player_profile
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
 
 class PlayerUpdateName_api(generics.UpdateAPIView):
     serializer_class = serializers.PlayerUpdateNameSerializer
@@ -86,14 +105,33 @@ class PlayerDelete_api(generics.DestroyAPIView):
     def perform_destroy(self, instance):
         instance.delete()
 
-class PlayerLogin_api(generics.CreateAPIView):
+class PlayerLogin_api(APIView):
     serializer_class = serializers.PlayerLoginSerializer
     permission_classes = [AllowAny]
 
-class PlayerLogout_api(generics.CreateAPIView):
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        player = serializer.save()
+        return Response(serializer.to_representation(player), status=status.HTTP_200_OK)
+
+class PlayerLogout_api(APIView):
     serializer_class = serializers.PlayerLogoutSerializer
     permission_classes = [IsAuthenticated]
 
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            player = request.user.player_profile
+            player.online = False
+            player.last_seen = timezone.now()
+            player.save()
+        except (AttributeError, Player.DoesNotExist):
+            pass
+
+        return Response({"code": 1000}, status=status.HTTP_200_OK)
 # ============CRUD FriendShip================
 
 class SendFriendRequest_api(generics.CreateAPIView):
@@ -127,8 +165,12 @@ class FriendRequestReject_api(generics.DestroyAPIView):
 
     def delete(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        serializer.is_valid(raise_exception=True)  
+        request_user = request.user
+
+        if instance.player_2.user != request_user:
+            return Response({"code": 1020}, status=status.HTTP_400_BAD_REQUEST)  # "Seul le destinataire peut rejeter cette demande."
+        if instance.status != 'pending':
+            return Response({"code": 1021}, status=status.HTTP_400_BAD_REQUEST)  # "Cette demande a déjà été traitée."
         self.perform_destroy(instance)
         return Response({"code": 1000}, status=status.HTTP_200_OK)
 
@@ -233,3 +275,4 @@ class UnblockPlayerView(generics.DestroyAPIView):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response({"code": 1000}, status=status.HTTP_200_OK)
+

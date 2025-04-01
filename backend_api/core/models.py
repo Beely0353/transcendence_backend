@@ -17,6 +17,9 @@ class Player(models.Model):
     victory = models.PositiveIntegerField(default=0)
     defeat = models.PositiveIntegerField(default=0)
     online = models.BooleanField(default=False)
+    last_seen = models.DateTimeField(null=True, blank=True)
+    description = models.TextField(max_length=500, blank=True, default="")
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True, default='avatars/default.jpg')
 
     friends = models.ManyToManyField('self', symmetrical=False, through='Friendship', related_name='friends_of')
 
@@ -32,6 +35,9 @@ class Friendship(models.Model):
         default='pending',
         max_length=10
     )
+
+    class Meta:
+        unique_together = ('player_1', 'player_2')
 
     def __str__(self):
         return f'{self.player_1.name} - {self.player_2.name} ({self.status})'

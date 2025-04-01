@@ -24,3 +24,9 @@ Code: 1026 - Vous ne pouvez pas vous bloquer vous-même.
 Code: 1027 - Ce joueur est déjà bloqué.
 Code: 1028 - Ce joueur n'est pas bloqué.
 Code: 1029 - Cette relation n'est pas une amitié acceptée.
+Code: 1030 - Vous devez être authentifié pour modifier votre profil.
+Code: 1031 - Vous ne pouvez modifier que votre propre profil.
+Code 1032 : Format de fichier non autorisé (ex. : seuls JPEG et PNG sont acceptés).
+Code 1033 : Poids du fichier trop élevé (ex. : max 2 Mo).
+Code 1034 : Dimensions de l’image trop grandes (ex. : max 500x500 pixels).
+Code 1035 : Impossible de lire l’image (ex. : fichier corrompu ou invalide)

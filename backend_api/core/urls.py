@@ -3,6 +3,10 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from . import views
 
+
+from django.conf import settings
+from django.conf.urls.static import static
+
 # ===========================
 # CONFIGURATION DU ROUTEUR DRF
 # ===========================
@@ -23,10 +27,11 @@ urlpatterns = [
 
     # CRUD PLAYER
     path('api/register/', views.PlayerRegister_api.as_view(), name='register_api'),
-    path('api/player', views.PlayerList_api.as_view(), name='player-detail'),
+    path('api/player/', views.PlayerList_api.as_view(), name='player-list'),
     path('api/player/<int:pk>/', views.PlayerDetail_api.as_view(), name='player-detail'),
     path('api/player/update-name/', views.PlayerUpdateName_api.as_view(), name='player-update-name'),
     path('api/player/update-PWD/', views.PlayerUpdatePWD_api.as_view(), name='player-update-pwd'),
+    path('api/player/update-info/', views.PlayerUpdateInfo_api.as_view(), name='player-update-info'),
     path('api/player/delete/', views.PlayerDelete_api.as_view(), name='player-delete'),
 
     # Authentification API
@@ -50,3 +55,7 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
+
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
