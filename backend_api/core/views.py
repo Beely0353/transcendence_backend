@@ -200,7 +200,7 @@ class FriendRequestCancel_api(generics.DestroyAPIView):
 class FriendRemove_api(generics.DestroyAPIView):
     serializer_class = serializers.FriendshipRemoveSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'id' 
+    lookup_field = 'pk' 
     queryset = Friendship.objects.all()
 
     def get_object(self):
@@ -253,19 +253,18 @@ class BlockListView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user.player_profile
-        return Block.objects.filter(blocker=user)
+        return Block.objects.filter(models.Q(blocker=user) | models.Q(blocked=user))
 
 class UnblockPlayerView(generics.DestroyAPIView):
     serializer_class = serializers.UnblockPlayerSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'id'
+    lookup_field = 'pk'
     queryset = Block.objects.all()
 
     def get_object(self):
         blocker = self.request.user.player_profile
         obj = super().get_object()
 
-        # Validation personnalisée
         if obj.blocker != blocker:
             raise serializers.ValidationError({"code": 1028})  # "Vous n'avez pas bloqué ce joueur."
         
@@ -273,6 +272,9 @@ class UnblockPlayerView(generics.DestroyAPIView):
 
     def delete(self, request, *args, **kwargs):
         instance = self.get_object()
-        self.perform_destroy(instance)
+        Block.objects.filter(
+            blocker=instance.blocker,
+            blocked=instance.blocked
+        ).delete()
         return Response({"code": 1000}, status=status.HTTP_200_OK)
 

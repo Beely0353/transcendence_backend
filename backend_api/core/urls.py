@@ -43,11 +43,11 @@ urlpatterns = [
     path('api/friend-request/accept/<int:pk>/', views.FriendRequestAccept_api.as_view(), name='friend-request-accept'),
     path('api/friend-request/reject/<int:pk>/', views.FriendRequestReject_api.as_view(), name='friend-request-reject'),
     path('api/friend-request/cancel/<int:pk>/', views.FriendRequestCancel_api.as_view(), name='cancel-friend-request'),
-    path('api/friend/remove/<int:id>/', views.FriendRemove_api.as_view(), name='remove-friend'),
+    path('api/friend/remove/<int:pk>/', views.FriendRemove_api.as_view(), name='remove-friend'),
     path('api/friend/list/', views.FriendshipList_api.as_view(), name='friendship-list'),
 
     # CRUD BLOCK
-    path('api/block/add', views.BlockPlayer_api.as_view(), name='block-player'),
+    path('api/block/add/', views.BlockPlayer_api.as_view(), name='block-player'),
     path('api/block/list/', views.BlockListView.as_view(), name='block-list'),
     path('api/block/remove/<int:pk>/', views.UnblockPlayerView.as_view(), name='unblock-player'),
 
